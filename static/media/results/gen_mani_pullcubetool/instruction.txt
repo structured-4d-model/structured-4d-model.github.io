@@ -1,0 +1,1 @@
+Given an L-shaped tool that is within the reach of the robot, leverage the tool to pull a cube that is out of it’s reach.
