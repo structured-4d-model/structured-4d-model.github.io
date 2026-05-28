@@ -107,6 +107,15 @@ body {
     height: 100%;
 }
 
+.method-overview-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 500px;
+  margin: 0 auto;
+  background: #fff;
+}
+
 .publication-body img {
 }
 
