@@ -22,7 +22,7 @@
   var DEFAULT_CAMERA = {
     // Angles are radians. For degrees, use degrees * Math.PI / 180.
     // yaw: Math.PI / 2,
-    yaw: 0,
+    yaw: Math.PI / 2,
     pitch: 0,
     roll: Math.PI / 2,
   };
@@ -231,6 +231,123 @@
     };
   }
 
+  function calculateBounds(positions, vertexCount) {
+    var min = [Infinity, Infinity, Infinity];
+    var max = [-Infinity, -Infinity, -Infinity];
+
+    for (var i = 0; i < vertexCount; i++) {
+      var index = i * 3;
+      var x = positions[index];
+      var y = positions[index + 1];
+      var z = positions[index + 2];
+      min[0] = Math.min(min[0], x);
+      min[1] = Math.min(min[1], y);
+      min[2] = Math.min(min[2], z);
+      max[0] = Math.max(max[0], x);
+      max[1] = Math.max(max[1], y);
+      max[2] = Math.max(max[2], z);
+    }
+
+    var center = [
+      (min[0] + max[0]) / 2,
+      (min[1] + max[1]) / 2,
+      (min[2] + max[2]) / 2,
+    ];
+    var radius = 0;
+    for (var k = 0; k < vertexCount; k++) {
+      var p = k * 3;
+      var dx = positions[p] - center[0];
+      var dy = positions[p + 1] - center[1];
+      var dz = positions[p + 2] - center[2];
+      radius = Math.max(radius, Math.sqrt(dx * dx + dy * dy + dz * dz));
+    }
+
+    return {
+      min: min,
+      max: max,
+      center: center,
+      radius: Math.max(radius, 0.01),
+    };
+  }
+
+  function combinePointClouds(layers) {
+    var validLayers = (layers || []).filter(function(layer) {
+      return layer && layer.pointCloud && layer.pointCloud.vertexCount;
+    });
+    var vertexCount = validLayers.reduce(function(total, layer) {
+      return total + layer.pointCloud.vertexCount;
+    }, 0);
+
+    if (!vertexCount) {
+      throw new Error("No point clouds to combine.");
+    }
+
+    var positions = new Float32Array(vertexCount * 3);
+    var colors = new Float32Array(vertexCount * 3);
+    var hasPointSizes = validLayers.some(function(layer) {
+      return Number.isFinite(layer.pointSize) ||
+        Boolean(layer.pointCloud.sizes && layer.pointCloud.sizes.length === layer.pointCloud.vertexCount);
+    });
+    var sizes = hasPointSizes ? new Float32Array(vertexCount) : null;
+    var vertexOffset = 0;
+
+    if (sizes) sizes.fill(NaN);
+
+    validLayers.forEach(function(layer) {
+      var pointCloud = layer.pointCloud;
+      var color = layer.color || null;
+      positions.set(pointCloud.positions, vertexOffset * 3);
+
+      if (color) {
+        for (var i = 0; i < pointCloud.vertexCount; i++) {
+          var colorIndex = (vertexOffset + i) * 3;
+          colors[colorIndex] = color[0];
+          colors[colorIndex + 1] = color[1];
+          colors[colorIndex + 2] = color[2];
+        }
+      } else {
+        colors.set(pointCloud.colors, vertexOffset * 3);
+      }
+
+      if (sizes) {
+        if (Number.isFinite(layer.pointSize)) {
+          for (var j = 0; j < pointCloud.vertexCount; j++) {
+            sizes[vertexOffset + j] = layer.pointSize;
+          }
+        } else if (pointCloud.sizes && pointCloud.sizes.length === pointCloud.vertexCount) {
+          sizes.set(pointCloud.sizes, vertexOffset);
+        }
+      }
+
+      vertexOffset += pointCloud.vertexCount;
+    });
+
+    return {
+      positions: positions,
+      colors: colors,
+      sizes: sizes,
+      vertexCount: vertexCount,
+      bounds: calculateBounds(positions, vertexCount),
+    };
+  }
+
+  function resolvePointSizes(pointCloud, fallbackPointSize) {
+    var fallback = Number.isFinite(fallbackPointSize) && fallbackPointSize > 0 ? fallbackPointSize : 2.2;
+    var sizes = new Float32Array(pointCloud.vertexCount);
+    var sourceSizes = pointCloud.sizes || null;
+
+    if (!sourceSizes || sourceSizes.length !== pointCloud.vertexCount) {
+      sizes.fill(fallback);
+      return sizes;
+    }
+
+    for (var i = 0; i < pointCloud.vertexCount; i++) {
+      var size = sourceSizes[i];
+      sizes[i] = Number.isFinite(size) && size > 0 ? size : fallback;
+    }
+    return sizes;
+  }
+
   function createShader(gl, type, source) {
     var shader = gl.createShader(type);
     gl.shaderSource(shader, source);
@@ -247,13 +364,14 @@
     var vertexSource = [
       "attribute vec3 a_position;",
       "attribute vec3 a_color;",
+      "attribute float a_point_size;",
       "uniform mat4 u_projection;",
       "uniform mat4 u_view;",
-      "uniform float u_pointSize;",
+      "uniform float u_pixel_ratio;",
       "varying vec3 v_color;",
       "void main() {",
       "  gl_Position = u_projection * u_view * vec4(a_position, 1.0);",
-      "  gl_PointSize = u_pointSize;",
+      "  gl_PointSize = a_point_size * u_pixel_ratio;",
       "  v_color = a_color;",
       "}",
     ].join("\n");
@@ -337,6 +455,15 @@
       pitch: camera.pitch,
       roll: camera.roll || 0,
       distance: camera.distance,
+    };
+  }
+
+  function resolveDefaultCamera(options) {
+    var defaultCamera = options.defaultCamera || {};
+    return {
+      yaw: Number.isFinite(defaultCamera.yaw) ? defaultCamera.yaw : DEFAULT_CAMERA.yaw,
+      pitch: Number.isFinite(defaultCamera.pitch) ? defaultCamera.pitch : DEFAULT_CAMERA.pitch,
+      roll: Number.isFinite(defaultCamera.roll) ? defaultCamera.roll : DEFAULT_CAMERA.roll,
     };
   }
 
@@ -429,16 +556,18 @@
     this.container = container;
     this.pointSize = options.pointSize || 2.2;
     this.onCameraChange = options.onCameraChange || null;
+    this.defaultCamera = resolveDefaultCamera(options);
     this.camera = {
       target: [0, 0, 0],
-      yaw: DEFAULT_CAMERA.yaw,
-      pitch: DEFAULT_CAMERA.pitch,
-      roll: DEFAULT_CAMERA.roll,
+      yaw: this.defaultCamera.yaw,
+      pitch: this.defaultCamera.pitch,
+      roll: this.defaultCamera.roll,
       distance: 2,
     };
     this.vertexCount = 0;
     this.positionBuffer = null;
     this.colorBuffer = null;
+    this.sizeBuffer = null;
     this.bounds = null;
     this.animationFrame = 0;
     this.activePointer = null;
@@ -489,9 +618,10 @@
     this.locations = {
       position: this.gl.getAttribLocation(this.program, "a_position"),
       color: this.gl.getAttribLocation(this.program, "a_color"),
+      pointSize: this.gl.getAttribLocation(this.program, "a_point_size"),
       projection: this.gl.getUniformLocation(this.program, "u_projection"),
       view: this.gl.getUniformLocation(this.program, "u_view"),
-      pointSize: this.gl.getUniformLocation(this.program, "u_pointSize"),
+      pixelRatio: this.gl.getUniformLocation(this.program, "u_pixel_ratio"),
     };
 
     this.bindControls();
@@ -614,9 +744,9 @@
   PlyPointCloudViewer.prototype.fitToBounds = function(bounds, silent) {
     this.camera.target = bounds.center.slice();
     this.camera.distance = Math.max(bounds.radius * 2.35, 0.1);
-    this.camera.pitch = DEFAULT_CAMERA.pitch;
-    this.camera.yaw = DEFAULT_CAMERA.yaw;
-    this.camera.roll = DEFAULT_CAMERA.roll;
+    this.camera.pitch = this.defaultCamera.pitch;
+    this.camera.yaw = this.defaultCamera.yaw;
+    this.camera.roll = this.defaultCamera.roll;
     this.cameraChanged(silent);
   };
 
@@ -647,6 +777,13 @@
     gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, pointCloud.colors, gl.STATIC_DRAW);
 
+    if (!this.sizeBuffer) this.sizeBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.sizeBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, resolvePointSizes(
+      pointCloud,
+      Number.isFinite(options.pointSize) ? options.pointSize : this.pointSize
+    ), gl.STATIC_DRAW);
+
     if (options.fit !== false) {
       this.fitToBounds(pointCloud.bounds, true);
     }
@@ -655,6 +792,7 @@
 
   PlyPointCloudViewer.prototype.load = async function(url, options) {
     if (!this.gl) return;
+    options = options || {};
     this.setStatus("Loading point cloud");
     try {
       var response = await fetch(url, { signal: options.signal });
@@ -671,6 +809,37 @@
         this.setStatus("Point clouds require a local HTTP server. Open the page through localhost instead of file://.", true);
       } else {
         this.setStatus(error.message || "Failed to load point cloud.", true);
+      }
+      throw error;
+    }
+  };
+
+  PlyPointCloudViewer.prototype.loadComposite = async function(layers, options) {
+    if (!this.gl) return;
+    options = options || {};
+    this.setStatus("Loading point clouds");
+    try {
+      var parsedLayers = await Promise.all((layers || []).map(async function(layer) {
+        var response = await fetch(layer.path, { signal: options.signal });
+        if (!response.ok) {
+          throw new Error("Failed to load " + layer.path);
+        }
+        var buffer = await response.arrayBuffer();
+        return {
+          pointCloud: parseBinaryPly(buffer),
+          color: layer.color || null,
+          pointSize: layer.pointSize,
+        };
+      }));
+      this.setPointCloud(combinePointClouds(parsedLayers), options);
+      this.setStatus("");
+    } catch (error) {
+      if (error.name === "AbortError") {
+        this.setStatus("");
+      } else if (error instanceof TypeError && global.location && global.location.protocol === "file:") {
+        this.setStatus("Point clouds require a local HTTP server. Open the page through localhost instead of file://.", true);
+      } else {
+        this.setStatus(error.message || "Failed to load point clouds.", true);
       }
       throw error;
     }
@@ -703,7 +872,7 @@
     gl.useProgram(this.program);
     gl.uniformMatrix4fv(this.locations.projection, false, projection);
     gl.uniformMatrix4fv(this.locations.view, false, view);
-    gl.uniform1f(this.locations.pointSize, this.pointSize * Math.min(global.devicePixelRatio || 1, 2));
+    gl.uniform1f(this.locations.pixelRatio, Math.min(global.devicePixelRatio || 1, 2));
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
     gl.enableVertexAttribArray(this.locations.position);
@@ -713,11 +882,18 @@
     gl.enableVertexAttribArray(this.locations.color);
     gl.vertexAttribPointer(this.locations.color, 3, gl.FLOAT, false, 0, 0);
 
+    if (this.locations.pointSize >= 0 && this.sizeBuffer) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.sizeBuffer);
+      gl.enableVertexAttribArray(this.locations.pointSize);
+      gl.vertexAttribPointer(this.locations.pointSize, 1, gl.FLOAT, false, 0, 0);
+    }
+
     gl.drawArrays(gl.POINTS, 0, this.vertexCount);
   };
 
   PlyPointCloudViewer.parsePlyHeader = parsePlyHeader;
   PlyPointCloudViewer.parseBinaryPly = parseBinaryPly;
+  PlyPointCloudViewer.combinePointClouds = combinePointClouds;
   PlyPointCloudViewer.DEFAULT_CAMERA = DEFAULT_CAMERA;
   PlyPointCloudViewer.projectAxisToScreen = projectAxisToScreen;
   PlyPointCloudViewer.orbitDeltaFromPointer = orbitDeltaFromPointer;

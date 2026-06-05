@@ -35,8 +35,10 @@
   <script src="./static/js/bulma-slider.min.js"></script>
   <script src="./static/js/index.js"></script>
   <script defer src="./static/js/planning-results-data.js"></script>
+  <script defer src="./static/js/real-world-results-data.js"></script>
   <script defer src="./static/js/ply-point-cloud-viewer.js"></script>
   <script defer src="./static/js/planning-results.js"></script>
+  <script defer src="./static/js/real-world-results.js"></script>
 </head>
 <body>
 
@@ -280,33 +282,81 @@
 </section>
 
 
-  <!-- Video Gallery Section -->
-  <section class="section" id="real-world-experiments">
+  <section class="section real-world-results-section" id="real-world-experiments">
     <div class="container is-max-desktop">
       <div class="columns is-centered has-text-centered">
         <div class="column is-full-width">
           <h2 class="title is-3">Real world experiments</h2>
 
-          <div class="content">
-            <h3 class="title is-5">Task: Pick the black block into the basket</h3>
-            <div class="columns is-multiline is-centered">
-              <div class="column is-4">
-                <video src="./static/media/videos/real/1.mov" autoplay muted loop playsinline
-                  style="width: 100%; height: auto;"></video>
-                <p class="has-text-centered" style="margin-top: 0.5rem;">Demo 1</p>
+          <div class="content real-world-results-summary">
+            <p>
+              Real-world results are learned from action-free demonstrations: after reconstructing the 3D point cloud, we
+              register predicted gripper geometry to recover end-effector poses and use motion planning to execute each
+              subgoal, providing a learning-free inverse-dynamics approach.
+            </p>
+          </div>
+
+          <div id="real-world-demo-tabs"
+               class="real-world-demo-tabs"
+               role="tablist"
+               aria-label="Real-world result demos"></div>
+
+          <div id="real-world-status" class="real-world-status" hidden></div>
+
+          <div class="real-world-results-shell">
+            <div class="real-world-results-header">
+              <div class="real-world-results-copy">
+                <h3 id="real-world-active-demo" class="title is-5">Loading demo</h3>
+                <p id="real-world-active-task"></p>
               </div>
 
-              <div class="column is-4">
-                <video src="./static/media/videos/real/2.mov" autoplay muted loop playsinline
-                  style="width: 100%; height: auto;"></video>
-                <p class="has-text-centered" style="margin-top: 0.5rem;">Demo 2</p>
+              <label class="real-world-gripper-toggle" for="real-world-show-gripper">
+                <input id="real-world-show-gripper" type="checkbox" checked>
+                <span>Show gripper</span>
+              </label>
+            </div>
+
+            <div class="real-world-media-deck">
+              <div class="real-world-viewer-card">
+                <div class="real-world-viewer-toolbar">
+                  <div id="real-world-stage-tabs"
+                       class="real-world-stage-tabs"
+                       role="tablist"
+                       aria-label="Real-world point-cloud stages"></div>
+                  <span id="real-world-stage-label" class="real-world-stage-label">Initial 3D</span>
+                </div>
+                <div class="real-world-viewer-stage">
+                  <button id="real-world-prev-stage"
+                          class="real-world-step-arrow real-world-step-arrow-left"
+                          type="button"
+                          aria-label="Previous real-world point-cloud stage">
+                    <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                  </button>
+                  <div id="real-world-viewer"
+                       class="real-world-viewer"
+                       aria-label="Real-world generated point cloud"></div>
+                  <button id="real-world-next-stage"
+                          class="real-world-step-arrow real-world-step-arrow-right"
+                          type="button"
+                          aria-label="Next real-world point-cloud stage">
+                    <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                  </button>
+                </div>
               </div>
 
-              <div class="column is-4">
-                <video src="./static/media/videos/real/3.mov" autoplay muted loop playsinline
-                  style="width: 100%; height: auto;"></video>
-                <p class="has-text-centered" style="margin-top: 0.5rem;">Demo 3</p>
-              </div>
+              <figure class="real-world-recording-panel">
+                <figcaption>Execution recording</figcaption>
+                <div class="real-world-recording-frame">
+                  <video id="real-world-recording"
+                         autoplay
+                         muted
+                         loop
+                         playsinline
+                         controls
+                         preload="metadata"
+                         aria-label="Real-world execution recording"></video>
+                </div>
+              </figure>
             </div>
           </div>
         </div>
