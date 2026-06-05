@@ -3,6 +3,7 @@
 
   var RESULT_ROOT = "./static/media/results";
   var PREDICTION_STEPS = [1, 2, 3, 4];
+  var VIDEO_STEPS = [0, 1, 2, 3, 4];
   var SCENE_IDS = [
     "gen_libero_scene0011",
     "gen_libero_scene0012",
@@ -58,8 +59,21 @@
   function createScene(sceneId) {
     var root = RESULT_ROOT + "/" + sceneId;
     var predictionPaths = {};
+    var videoClips = [{
+      key: "task",
+      label: "Task",
+      path: root + "/task.mp4",
+    }];
     PREDICTION_STEPS.forEach(function(step) {
       predictionPaths[step] = root + "/step_" + step + "_pred.ply";
+    });
+    VIDEO_STEPS.forEach(function(step) {
+      videoClips.push({
+        key: "unroll-" + step,
+        label: "Unroll " + step,
+        badge: step === 0 ? "GT" : "",
+        path: root + "/step_" + step + ".mp4",
+      });
     });
 
     return {
@@ -71,6 +85,7 @@
       instruction: SCENE_INSTRUCTIONS[sceneId],
       inputPath: root + "/step_0_gt.ply",
       predictionPaths: predictionPaths,
+      videoClips: videoClips,
     };
   }
 
@@ -78,6 +93,7 @@
     RESULT_ROOT: RESULT_ROOT,
     RESULT_SCENES: SCENE_IDS.map(createScene),
     PREDICTION_STEPS: PREDICTION_STEPS,
+    VIDEO_STEPS: VIDEO_STEPS,
     formatSceneTitle: formatSceneTitle,
   };
 })(typeof window !== "undefined" ? window : globalThis);

@@ -402,6 +402,70 @@ body {
   right: 0.85rem;
 }
 
+.planning-results-video-panel {
+  padding: 1rem 1.1rem 1.15rem;
+  border-top: 1px solid #e6ece8;
+  background: #f7faf8;
+}
+
+.planning-results-video-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(126px, 1fr));
+  gap: 0.7rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+  scrollbar-color: #b7c9c1 transparent;
+}
+
+.planning-results-video-card {
+  min-width: 126px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #dce4df;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgba(43, 72, 61, 0.08);
+}
+
+.planning-results-video-card video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: #111816;
+}
+
+.planning-results-video-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  min-height: 2.15rem;
+  padding: 0.45rem 0.55rem;
+  color: #263631;
+  font-family: 'Google Sans', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.planning-results-video-caption span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.planning-results-video-badge {
+  flex: 0 0 auto;
+  padding: 0.12rem 0.34rem;
+  border: 1px solid #9fc8b9;
+  border-radius: 999px;
+  background: #edf8f3;
+  color: #27644f;
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
 .ply-viewer-canvas {
   display: block;
   width: 100%;

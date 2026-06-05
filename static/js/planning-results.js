@@ -67,6 +67,48 @@
     });
   }
 
+  function renderSceneVideos(scene) {
+    var strip = $("#planning-results-video-strip");
+    if (!strip) return;
+    strip.innerHTML = "";
+
+    (scene.videoClips || []).forEach(function(clip) {
+      var card = document.createElement("figure");
+      card.className = "planning-results-video-card";
+
+      var video = document.createElement("video");
+      video.src = clip.path;
+      video.autoplay = true;
+      video.muted = true;
+      video.loop = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.setAttribute("autoplay", "");
+      video.setAttribute("muted", "");
+      video.setAttribute("loop", "");
+      video.setAttribute("playsinline", "");
+      video.setAttribute("aria-label", scene.title + " " + clip.label + " video");
+
+      var caption = document.createElement("figcaption");
+      caption.className = "planning-results-video-caption";
+
+      var label = document.createElement("span");
+      label.textContent = clip.label;
+      caption.appendChild(label);
+
+      if (clip.badge) {
+        var badge = document.createElement("span");
+        badge.className = "planning-results-video-badge";
+        badge.textContent = clip.badge;
+        caption.appendChild(badge);
+      }
+
+      card.appendChild(video);
+      card.appendChild(caption);
+      strip.appendChild(card);
+    });
+  }
+
   function getStepPath(scene, step) {
     if (step === 0) return scene.inputPath;
     return scene.predictionPaths[step];
@@ -157,6 +199,7 @@
       setGallerySelection(scene.id);
       setText("#planning-results-active-scene", scene.title);
       setText("#planning-results-active-instruction", scene.instruction || "");
+      renderSceneVideos(scene);
       setSectionStatus("Loading " + scene.title + "...");
 
       await loadStep(selectedStep, true);

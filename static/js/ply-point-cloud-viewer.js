@@ -393,6 +393,21 @@
     };
   }
 
+  function orbitDeltaFromPointer(camera, dx, dy, width, height) {
+    var normalizedDx = dx / (width || 1);
+    var normalizedDy = dy / (height || 1);
+    var roll = camera.roll || 0;
+    var cosRoll = Math.cos(roll);
+    var sinRoll = Math.sin(roll);
+    var yawInput = normalizedDx * cosRoll - normalizedDy * sinRoll;
+    var pitchInput = normalizedDx * sinRoll + normalizedDy * cosRoll;
+
+    return {
+      yawDelta: -yawInput * Math.PI * 1.8,
+      pitchDelta: -pitchInput * Math.PI,
+    };
+  }
+
   function createAxesWidget(documentRef) {
     var axes = documentRef.createElement("div");
     axes.className = "ply-viewer-axes";
@@ -521,8 +536,9 @@
       if (self.activePointer.mode === "pan") {
         self.pan(dx, dy, width, height);
       } else {
-        self.camera.yaw -= (dx / width) * Math.PI * 1.8;
-        self.camera.pitch = clamp(self.camera.pitch - (dy / height) * Math.PI, -1.45, 1.45);
+        var orbitDelta = orbitDeltaFromPointer(self.camera, dx, dy, width, height);
+        self.camera.yaw += orbitDelta.yawDelta;
+        self.camera.pitch = clamp(self.camera.pitch + orbitDelta.pitchDelta, -1.45, 1.45);
       }
       self.cameraChanged();
     });
@@ -704,6 +720,7 @@
   PlyPointCloudViewer.parseBinaryPly = parseBinaryPly;
   PlyPointCloudViewer.DEFAULT_CAMERA = DEFAULT_CAMERA;
   PlyPointCloudViewer.projectAxisToScreen = projectAxisToScreen;
+  PlyPointCloudViewer.orbitDeltaFromPointer = orbitDeltaFromPointer;
 
   function PlyCameraSync(viewers) {
     this.viewers = viewers;
